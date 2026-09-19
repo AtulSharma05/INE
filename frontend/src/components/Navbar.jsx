@@ -1,12 +1,7 @@
 import React from 'react';
 import { Plus, Server } from 'lucide-react';
 
-interface NavbarProps {
-  backendHealthy: boolean;
-  onOpenSearch: () => void;
-}
-
-export const Navbar: React.FC<NavbarProps> = ({ backendHealthy, onOpenSearch }) => {
+export function Navbar({ backendHealthy, onOpenSearch }) {
   return (
     <nav className="navbar">
       <div className="nav-brand">
@@ -31,4 +26,4 @@ export const Navbar: React.FC<NavbarProps> = ({ backendHealthy, onOpenSearch }) 
       </div>
     </nav>
   );
-};
+}

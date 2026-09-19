@@ -1,40 +1,11 @@
-import { chromium, Browser, BrowserContext, Page } from 'playwright';
-import { validateScrapedData } from './parser';
-import { ScrapedData } from '../types';
-
-export interface ScraperAttemptRecord {
-  attempt_number: number;
-  status: 'success' | 'timeout' | 'http_error' | 'parse_error' | 'failed';
-  http_status: number | null;
-  response_time_ms: number;
-  error_message: string | null;
-  timestamp: string;
-}
-
-export interface ScraperExecutionResult {
-  success: boolean;
-  data?: ScrapedData;
-  final_status: 'success' | 'failed';
-  total_attempts: number;
-  attempts: ScraperAttemptRecord[];
-  error?: string;
-}
-
-export interface ScraperOptions {
-  headless?: boolean;
-  slowMo?: number; // useful for headed video runs
-  maxAttempts?: number;
-  baseUrl?: string;
-}
+const { chromium } = require('playwright');
+const { validateScrapedData } = require('./parser');
 
 /**
  * Robust Playwright Scraper for INE Mock Store.
  * Handles mouse dwell & move challenges, honeypot traps, synthetic latency, and exponential backoff retries.
  */
-export async function scrapeProductWithRetries(
-  storeProductId: string,
-  options: ScraperOptions = {}
-): Promise<ScraperExecutionResult> {
+async function scrapeProductWithRetries(storeProductId, options = {}) {
   const {
     headless = true,
     slowMo = 0,
@@ -43,9 +14,9 @@ export async function scrapeProductWithRetries(
   } = options;
 
   const productUrl = `${baseUrl.replace(/\/$/, '')}/product/${storeProductId}`;
-  const attempts: ScraperAttemptRecord[] = [];
+  const attempts = [];
 
-  let browser: Browser | null = null;
+  let browser = null;
 
   try {
     browser = await chromium.launch({
@@ -56,10 +27,10 @@ export async function scrapeProductWithRetries(
 
     for (let attemptNum = 1; attemptNum <= maxAttempts; attemptNum++) {
       const startTime = Date.now();
-      let attemptStatus: ScraperAttemptRecord['status'] = 'failed';
-      let httpStatus: number | null = null;
-      let context: BrowserContext | null = null;
-      let page: Page | null = null;
+      let attemptStatus = 'failed';
+      let httpStatus = null;
+      let context = null;
+      let page = null;
 
       try {
         context = await browser.newContext({
@@ -75,7 +46,7 @@ export async function scrapeProductWithRetries(
           timeout: 20000,
         });
 
-        httpStatus = response?.status() ?? null;
+        httpStatus = response ? response.status() : null;
         if (httpStatus && httpStatus >= 400) {
           attemptStatus = 'http_error';
           throw new Error(`HTTP Error ${httpStatus} received from storefront`);
@@ -86,7 +57,7 @@ export async function scrapeProductWithRetries(
         await page.waitForSelector(priceBlockSelector, { timeout: 10000 });
 
         // 3. Human interaction simulation:
-        // The mock store Ar class requires minMoves: 8 and minDwellMs: 600
+        // The mock store requires minMoves: 8 and minDwellMs: 600
         const priceBlock = page.locator(priceBlockSelector);
         const box = await priceBlock.boundingBox();
 
@@ -110,7 +81,7 @@ export async function scrapeProductWithRetries(
         
         // Wait until not disabled
         await page.waitForFunction(
-          (btn) => !btn?.hasAttribute('disabled'),
+          (btn) => !btn || !btn.hasAttribute('disabled'),
           await revealBtn.elementHandle(),
           { timeout: 5000 }
         );
@@ -119,8 +90,6 @@ export async function scrapeProductWithRetries(
         await revealBtn.click();
 
         // 5. Handle dynamic loading states:
-        // The mock store might transition: idle -> loading/retrying -> success / error
-        // Wait up to 15 seconds for .price-success or .price-error
         await page.waitForSelector('.price-block.price-success, .price-block.price-error', {
           timeout: 15000,
         });
@@ -133,16 +102,10 @@ export async function scrapeProductWithRetries(
         }
 
         // 6. Extraction while carefully excluding honeypot elements:
-        // The mock store inserts deceptive hidden spans:
-        // - <span class="price-value" aria-hidden="true" style="display:none">
-        // - <span class="amount" data-price="true" aria-hidden="true" style="display:none">
-        // We evaluate strictly visible text from the real price carrier!
         const extracted = await page.evaluate(() => {
           const priceBlockEl = document.querySelector('.price-block.price-success');
           if (!priceBlockEl) return null;
 
-          // Find the visible price element inside .price-main
-          // Exclude anything with aria-hidden="true" or display: none
           const mainEl = priceBlockEl.querySelector('.price-main');
           let rawPriceText = '';
           if (mainEl) {
@@ -152,22 +115,20 @@ export async function scrapeProductWithRetries(
                 style.display !== 'none' &&
                 style.visibility !== 'hidden' &&
                 span.getAttribute('aria-hidden') !== 'true' &&
-                !span.classList.contains('mrp') && // exclude crossed-out MRP
-                !span.classList.contains('badge') && // exclude discount % badge
-                !span.textContent?.toLowerCase().includes('off') &&
-                !span.textContent?.toLowerCase().includes('deal price')
+                !span.classList.contains('mrp') &&
+                !span.classList.contains('badge') &&
+                !span.textContent.toLowerCase().includes('off') &&
+                !span.textContent.toLowerCase().includes('deal price')
               );
             });
 
             if (visibleSpans.length > 0) {
-              // The main price span
               rawPriceText = visibleSpans[0].textContent || '';
             }
           }
 
-          // Stock extraction: find .stock-badge
           const stockEl = priceBlockEl.querySelector('.stock-badge');
-          const rawStockText = stockEl?.textContent || '';
+          const rawStockText = stockEl ? stockEl.textContent || '' : '';
 
           return { rawPriceText, rawStockText };
         });
@@ -180,7 +141,6 @@ export async function scrapeProductWithRetries(
         // 7. Validate Zero-Pollution Data Invariant
         const validatedData = validateScrapedData(extracted.rawPriceText, extracted.rawStockText);
 
-        // Attempt succeeded!
         const duration = Date.now() - startTime;
         attempts.push({
           attempt_number: attemptNum,
@@ -198,9 +158,9 @@ export async function scrapeProductWithRetries(
           total_attempts: attemptNum,
           attempts,
         };
-      } catch (err: any) {
+      } catch (err) {
         const duration = Date.now() - startTime;
-        const errText = (err?.message || String(err)) as string;
+        const errText = err ? err.message || String(err) : 'Unknown error';
 
         if (errText.toLowerCase().includes('timeout')) {
           attemptStatus = 'timeout';
@@ -229,13 +189,13 @@ export async function scrapeProductWithRetries(
       }
     }
 
-    // If we reach here, all attempts failed
+    // All attempts failed
     return {
       success: false,
       final_status: 'failed',
       total_attempts: maxAttempts,
       attempts,
-      error: attempts[attempts.length - 1]?.error_message || 'All retry attempts exhausted',
+      error: attempts[attempts.length - 1] ? attempts[attempts.length - 1].error_message : 'All retry attempts exhausted',
     };
   } finally {
     if (browser) {
@@ -243,3 +203,7 @@ export async function scrapeProductWithRetries(
     }
   }
 }
+
+module.exports = {
+  scrapeProductWithRetries,
+};

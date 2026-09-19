@@ -1,13 +1,11 @@
-import express from 'express';
-import cors from 'cors';
-import dotenv from 'dotenv';
+const express = require('express');
+const cors = require('cors');
+require('dotenv').config();
 
-dotenv.config();
-
-import { catalogRouter } from './routes/catalog.routes';
-import { productsRouter } from './routes/products.routes';
-import { scrapeRouter } from './routes/scrape.routes';
-import { catalogService } from './services/catalogService';
+const { catalogRouter } = require('./routes/catalog.routes');
+const { productsRouter } = require('./routes/products.routes');
+const { scrapeRouter } = require('./routes/scrape.routes');
+const { catalogService } = require('./services/catalogService');
 
 const app = express();
 const PORT = process.env.PORT || 5001;
@@ -32,11 +30,11 @@ app.use('/api/products', productsRouter);
 app.use('/api/scrape', scrapeRouter);
 
 // Global Error Handler
-app.use((err: any, req: express.Request, res: express.Response, next: express.NextFunction) => {
+app.use((err, req, res, next) => {
   console.error('Unhandled Server Error:', err);
   res.status(500).json({
     success: false,
-    error: err?.message || 'Internal Server Error',
+    error: err ? err.message : 'Internal Server Error',
   });
 });
 
@@ -49,13 +47,12 @@ if (process.env.NODE_ENV !== 'test') {
     console.log(`  Health Check: http://localhost:${PORT}/api/health`);
     console.log(`====================================================`);
 
-    // Pre-warm catalog cache in background for instant search
     catalogService.refreshCatalog().then((items) => {
       console.log(`✅ Pre-warmed mock store catalog index: ${items.length} items loaded.`);
     }).catch((err) => {
-      console.warn('⚠️ Could not pre-warm catalog on boot (will retry on first search):', err?.message);
+      console.warn('⚠️ Could not pre-warm catalog on boot (will retry on first search):', err ? err.message : err);
     });
   });
 }
 
-export default app;
+module.exports = app;

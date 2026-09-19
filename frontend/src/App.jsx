@@ -3,16 +3,15 @@ import { Navbar } from './components/Navbar';
 import { TrackedProductCard } from './components/TrackedProductCard';
 import { ProductSearchModal } from './components/ProductSearchModal';
 import { ProductDetailModal } from './components/ProductDetailModal';
-import type { Product } from './types';
 import { api } from './api/client';
 import { ShoppingBag, RefreshCw } from 'lucide-react';
 
 export function App() {
-  const [products, setProducts] = useState<Product[]>([]);
+  const [products, setProducts] = useState([]);
   const [loading, setLoading] = useState(true);
   const [backendHealthy, setBackendHealthy] = useState(false);
   const [isSearchOpen, setIsSearchOpen] = useState(false);
-  const [selectedProduct, setSelectedProduct] = useState<Product | null>(null);
+  const [selectedProduct, setSelectedProduct] = useState(null);
 
   const loadProducts = useCallback(async () => {
     try {
@@ -40,7 +39,6 @@ export function App() {
     loadProducts();
     checkHealth();
 
-    // Regular interval to refresh data (every 30 seconds)
     const interval = setInterval(() => {
       loadProducts();
       checkHealth();

@@ -1,10 +1,9 @@
-import request from 'supertest';
-import app from '../src/server';
-import { scrapeService, inMemoryDb } from '../src/services/scrapeService';
+const request = require('supertest');
+const app = require('../src/server');
+const { scrapeService, inMemoryDb } = require('../src/services/scrapeService');
 
 describe('Backend REST API Tests', () => {
   beforeEach(() => {
-    // Reset in-memory database between test cases
     inMemoryDb.products.clear();
     inMemoryDb.runs.clear();
     inMemoryDb.attempts.clear();
@@ -65,16 +64,13 @@ describe('Backend REST API Tests', () => {
         .send({ store_product_id: '886' });
       const internalId = trackRes.body.product.id;
 
-      // Untrack
       const deleteRes = await request(app).delete(`/api/products/${internalId}`);
       expect(deleteRes.status).toBe(200);
       expect(deleteRes.body.product.is_active).toBe(false);
 
-      // Verify omitted from active products list
       const activeRes = await request(app).get('/api/products');
       expect(activeRes.body.products.length).toBe(0);
 
-      // Verify present when including inactive (data preserved)
       const allRes = await request(app).get('/api/products?includeInactive=true');
       expect(allRes.body.products.length).toBe(1);
       expect(allRes.body.products[0].is_active).toBe(false);
@@ -104,12 +100,14 @@ describe('Backend REST API Tests', () => {
     it('should reject concurrent scheduled batches with 409 Conflict', async () => {
       process.env.CRON_SECRET = 'super-secret-cron-token';
 
-      // Mock isBatchRunning to return true
-      jest.spyOn(scrapeService, 'isBatchRunning').mockReturnValueOnce(true);
+      const originalIsBatchRunning = scrapeService.isBatchRunning;
+      scrapeService.isBatchRunning = () => true;
 
       const res = await request(app)
         .post('/api/scrape/scheduled')
         .set('Authorization', 'Bearer super-secret-cron-token');
+
+      scrapeService.isBatchRunning = originalIsBatchRunning;
 
       expect(res.status).toBe(409);
       expect(res.body.status).toBe('already_running');

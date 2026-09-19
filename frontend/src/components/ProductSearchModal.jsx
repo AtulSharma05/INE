@@ -1,26 +1,18 @@
 import React, { useState, useEffect } from 'react';
 import { Search, X, Loader2, Plus, Check } from 'lucide-react';
 import { api } from '../api/client';
-import type { CatalogItem } from '../types';
 
-interface ProductSearchModalProps {
-  isOpen: boolean;
-  onClose: () => void;
-  onProductTracked: () => void;
-  trackedStoreIds: Set<string>;
-}
-
-export const ProductSearchModal: React.FC<ProductSearchModalProps> = ({
+export function ProductSearchModal({
   isOpen,
   onClose,
   onProductTracked,
   trackedStoreIds,
-}) => {
+}) {
   const [query, setQuery] = useState('');
-  const [results, setResults] = useState<CatalogItem[]>([]);
+  const [results, setResults] = useState([]);
   const [loading, setLoading] = useState(false);
-  const [trackingId, setTrackingId] = useState<number | null>(null);
-  const [error, setError] = useState<string | null>(null);
+  const [trackingId, setTrackingId] = useState(null);
+  const [error, setError] = useState(null);
 
   useEffect(() => {
     if (!isOpen) return;
@@ -40,7 +32,7 @@ export const ProductSearchModal: React.FC<ProductSearchModalProps> = ({
         })
         .catch((err) => {
           if (!cancel) {
-            setError(err?.message || 'Failed to search store');
+            setError(err ? err.message : 'Failed to search store');
             setLoading(false);
           }
         });
@@ -54,13 +46,13 @@ export const ProductSearchModal: React.FC<ProductSearchModalProps> = ({
 
   if (!isOpen) return null;
 
-  const handleTrack = async (item: CatalogItem) => {
+  const handleTrack = async (item) => {
     try {
       setTrackingId(item.id);
       await api.trackProduct(item.id.toString());
       onProductTracked();
-    } catch (err: any) {
-      alert(`Error tracking product: ${err?.message || err}`);
+    } catch (err) {
+      alert(`Error tracking product: ${err ? err.message : err}`);
     } finally {
       setTrackingId(null);
     }
@@ -145,4 +137,4 @@ export const ProductSearchModal: React.FC<ProductSearchModalProps> = ({
       </div>
     </div>
   );
-};
+}

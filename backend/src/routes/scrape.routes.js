@@ -1,17 +1,16 @@
-import { Router, Request, Response } from 'express';
-import { supabase } from '../config/supabase';
-import { inMemoryDb, scrapeService } from '../services/scrapeService';
-import { Product } from '../types';
+const { Router } = require('express');
+const { supabase } = require('../config/supabase');
+const { inMemoryDb, scrapeService } = require('../services/scrapeService');
 
-export const scrapeRouter = Router();
+const scrapeRouter = Router();
 
 // POST /api/scrape/manual/:productId - Trigger an immediate manual scrape
-scrapeRouter.post('/manual/:productId', async (req: Request, res: Response) => {
+scrapeRouter.post('/manual/:productId', async (req, res) => {
   try {
     const productId = req.params.productId;
-    const mode = (req.query.mode as string) === 'headed' ? 'headed' : 'headless';
+    const mode = req.query.mode === 'headed' ? 'headed' : 'headless';
 
-    let product: Product | null = null;
+    let product = null;
 
     if (supabase) {
       const { data, error } = await supabase
@@ -23,7 +22,7 @@ scrapeRouter.post('/manual/:productId', async (req: Request, res: Response) => {
       if (error || !data) {
         return res.status(404).json({ success: false, error: 'Product not found' });
       }
-      product = data as Product;
+      product = data;
     } else {
       product = inMemoryDb.products.get(productId) || null;
       if (!product) {
@@ -40,15 +39,13 @@ scrapeRouter.post('/manual/:productId', async (req: Request, res: Response) => {
       data: result.data || null,
       error: result.error || null,
     });
-  } catch (err: any) {
-    res.status(500).json({ success: false, error: err?.message || 'Manual scrape failed' });
+  } catch (err) {
+    res.status(500).json({ success: false, error: err ? err.message : 'Manual scrape failed' });
   }
 });
 
 // POST /api/scrape/scheduled - Trigger scheduled scrape across all active products
-// Secured via CRON_SECRET Bearer token for cron-job.org
-// Enforces Single-Flight Batch Mutex (409 if already in flight)
-scrapeRouter.post('/scheduled', async (req: Request, res: Response) => {
+scrapeRouter.post('/scheduled', async (req, res) => {
   try {
     const expectedSecret = process.env.CRON_SECRET;
     if (expectedSecret) {
@@ -63,7 +60,6 @@ scrapeRouter.post('/scheduled', async (req: Request, res: Response) => {
       }
     }
 
-    // Check if another scheduled batch is already running
     if (scrapeService.isBatchRunning()) {
       return res.status(409).json({
         success: false,
@@ -72,7 +68,6 @@ scrapeRouter.post('/scheduled', async (req: Request, res: Response) => {
       });
     }
 
-    // Run batch with controlled concurrency
     const outcome = await scrapeService.runScheduledBatch();
 
     if (outcome.status === 'already_running') {
@@ -88,10 +83,12 @@ scrapeRouter.post('/scheduled', async (req: Request, res: Response) => {
       status: 'completed',
       summary: outcome,
     });
-  } catch (err: any) {
+  } catch (err) {
     res.status(500).json({
       success: false,
-      error: err?.message || 'Scheduled scrape batch failed',
+      error: err ? err.message : 'Scheduled scrape batch failed',
     });
   }
 });
+
+module.exports = { scrapeRouter };

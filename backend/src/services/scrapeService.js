@@ -1,42 +1,41 @@
-import pLimit from 'p-limit';
-import { supabase } from '../config/supabase';
-import { scrapeProductWithRetries, ScraperExecutionResult } from '../scrapers/playwrightScraper';
-import { Product, ScrapeRun, ScrapeAttempt, PriceHistory } from '../types';
+const crypto = require('crypto');
+const pLimit = require('p-limit');
+const { supabase } = require('../config/supabase');
+const { scrapeProductWithRetries } = require('../scrapers/playwrightScraper');
 
 // In-memory fallback store when Supabase credentials are not yet configured
 class InMemoryStore {
-  products: Map<string, Product> = new Map();
-  runs: Map<string, ScrapeRun> = new Map();
-  attempts: Map<string, ScrapeAttempt[]> = new Map();
-  history: Map<string, PriceHistory[]> = new Map();
+  constructor() {
+    this.products = new Map();
+    this.runs = new Map();
+    this.attempts = new Map();
+    this.history = new Map();
+  }
 }
 
-export const inMemoryDb = new InMemoryStore();
+const inMemoryDb = new InMemoryStore();
 
 class ScrapeService {
-  // Idempotency / Mutex guard for scheduled scrape batch
-  private isScheduledBatchRunning: boolean = false;
-  private concurrencyLimit = parseInt(process.env.SCRAPE_CONCURRENCY || '2', 10);
+  constructor() {
+    this.isScheduledBatchRunning = false;
+    this.concurrencyLimit = parseInt(process.env.SCRAPE_CONCURRENCY || '2', 10);
+  }
 
   /**
    * Checks if a scheduled batch is already running.
    */
-  isBatchRunning(): boolean {
+  isBatchRunning() {
     return this.isScheduledBatchRunning;
   }
 
   /**
    * Executes a scrape run for a single tracked product.
    */
-  async scrapeProduct(
-    product: Product,
-    triggerSource: 'manual' | 'scheduled' = 'manual',
-    executionMode: 'headless' | 'headed' = 'headless'
-  ): Promise<{ run: ScrapeRun; result: ScraperExecutionResult }> {
+  async scrapeProduct(product, triggerSource = 'manual', executionMode = 'headless') {
     const runId = crypto.randomUUID();
     const startedAt = new Date().toISOString();
 
-    const scrapeRun: ScrapeRun = {
+    const scrapeRun = {
       id: runId,
       product_id: product.id,
       started_at: startedAt,
@@ -75,7 +74,7 @@ class ScrapeService {
     scrapeRun.total_attempts = result.total_attempts;
 
     // 3. Persist each individual attempt honestly in scrape_attempts
-    const attemptRecords: ScrapeAttempt[] = result.attempts.map((att) => ({
+    const attemptRecords = (result.attempts || []).map((att) => ({
       id: crypto.randomUUID(),
       run_id: runId,
       attempt_number: att.attempt_number,
@@ -107,7 +106,7 @@ class ScrapeService {
     // 4. Zero-Pollution Data Invariant Enforcement:
     // Only insert into price_history if both price > 0 and stock >= 0
     if (result.success && result.data && result.data.price > 0 && result.data.stock >= 0) {
-      const historyRecord: PriceHistory = {
+      const historyRecord = {
         id: crypto.randomUUID(),
         product_id: product.id,
         run_id: runId,
@@ -157,7 +156,6 @@ class ScrapeService {
         }
       }
     } else {
-      // ZERO POLLUTION: Never write to price_history if scrape failed or data is suspicious
       console.warn(
         `[ZERO-POLLUTION] Run ${runId} for product ${product.name} did not yield valid price/stock. No price_history row written.`
       );
@@ -171,20 +169,14 @@ class ScrapeService {
    * Executes scheduled scrape for all active tracked products.
    * Guarded by single-flight batch mutex and controlled concurrency.
    */
-  async runScheduledBatch(): Promise<{
-    status: 'completed' | 'already_running';
-    totalProducts?: number;
-    successCount?: number;
-    failureCount?: number;
-  }> {
+  async runScheduledBatch() {
     if (this.isScheduledBatchRunning) {
       return { status: 'already_running' };
     }
 
     this.isScheduledBatchRunning = true;
     try {
-      // Query active tracked products
-      let activeProducts: Product[] = [];
+      let activeProducts = [];
 
       if (supabase) {
         const { data, error } = await supabase
@@ -193,7 +185,7 @@ class ScrapeService {
           .eq('is_active', true);
 
         if (!error && data) {
-          activeProducts = data as Product[];
+          activeProducts = data;
         }
       } else {
         activeProducts = Array.from(inMemoryDb.products.values()).filter((p) => p.is_active);
@@ -241,4 +233,9 @@ class ScrapeService {
   }
 }
 
-export const scrapeService = new ScrapeService();
+const scrapeService = new ScrapeService();
+
+module.exports = {
+  inMemoryDb,
+  scrapeService,
+};

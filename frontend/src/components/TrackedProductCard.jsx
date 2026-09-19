@@ -1,19 +1,12 @@
 import React, { useState } from 'react';
 import { RefreshCw, History, Trash2, ExternalLink } from 'lucide-react';
-import type { Product } from '../types';
 import { api } from '../api/client';
 
-interface TrackedProductCardProps {
-  product: Product;
-  onRefreshNeeded: () => void;
-  onOpenDetails: (product: Product) => void;
-}
-
-export const TrackedProductCard: React.FC<TrackedProductCardProps> = ({
+export function TrackedProductCard({
   product,
   onRefreshNeeded,
   onOpenDetails,
-}) => {
+}) {
   const [scraping, setScraping] = useState(false);
   const [untracking, setUntracking] = useState(false);
 
@@ -22,8 +15,8 @@ export const TrackedProductCard: React.FC<TrackedProductCardProps> = ({
       setScraping(true);
       await api.triggerManualScrape(product.id);
       onRefreshNeeded();
-    } catch (err: any) {
-      alert(`Scrape failed: ${err?.message || err}`);
+    } catch (err) {
+      alert(`Scrape failed: ${err ? err.message : err}`);
     } finally {
       setScraping(false);
     }
@@ -37,14 +30,14 @@ export const TrackedProductCard: React.FC<TrackedProductCardProps> = ({
       setUntracking(true);
       await api.untrackProduct(product.id);
       onRefreshNeeded();
-    } catch (err: any) {
-      alert(`Untrack failed: ${err?.message || err}`);
+    } catch (err) {
+      alert(`Untrack failed: ${err ? err.message : err}`);
     } finally {
       setUntracking(false);
     }
   };
 
-  const formatPrice = (val: number | null, curr: string) => {
+  const formatPrice = (val, curr) => {
     if (val === null || val === undefined) return '—';
     return new Intl.NumberFormat('en-IN', {
       style: 'currency',
@@ -53,7 +46,7 @@ export const TrackedProductCard: React.FC<TrackedProductCardProps> = ({
     }).format(val);
   };
 
-  const formatLastScraped = (iso: string | null) => {
+  const formatLastScraped = (iso) => {
     if (!iso) return 'Never scraped';
     const date = new Date(iso);
     return date.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) + ' on ' + date.toLocaleDateString();
@@ -139,4 +132,4 @@ export const TrackedProductCard: React.FC<TrackedProductCardProps> = ({
       </div>
     </div>
   );
-};
+}

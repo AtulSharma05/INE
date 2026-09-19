@@ -1,10 +1,10 @@
-import {
+const {
   parsePrice,
   parseStock,
   normalizeUnicodeDigits,
   cleanInvisibleCharacters,
   validateScrapedData,
-} from '../src/scrapers/parser';
+} = require('../src/scrapers/parser');
 
 describe('Parser & Zero-Pollution Data Invariant', () => {
   describe('normalizeUnicodeDigits', () => {

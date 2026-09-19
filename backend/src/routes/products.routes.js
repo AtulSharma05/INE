@@ -1,13 +1,13 @@
-import { Router, Request, Response } from 'express';
-import { supabase } from '../config/supabase';
-import { inMemoryDb, scrapeService } from '../services/scrapeService';
-import { catalogService } from '../services/catalogService';
-import { Product } from '../types';
+const crypto = require('crypto');
+const { Router } = require('express');
+const { supabase } = require('../config/supabase');
+const { inMemoryDb, scrapeService } = require('../services/scrapeService');
+const { catalogService } = require('../services/catalogService');
 
-export const productsRouter = Router();
+const productsRouter = Router();
 
 // GET /api/products - List tracked products
-productsRouter.get('/', async (req: Request, res: Response) => {
+productsRouter.get('/', async (req, res) => {
   try {
     const includeInactive = req.query.includeInactive === 'true';
 
@@ -26,35 +26,32 @@ productsRouter.get('/', async (req: Request, res: Response) => {
       return res.json({ success: true, products: data });
     }
 
-    // In-memory fallback
     const all = Array.from(inMemoryDb.products.values());
     const filtered = includeInactive ? all : all.filter((p) => p.is_active);
     res.json({ success: true, products: filtered });
-  } catch (err: any) {
-    res.status(500).json({ success: false, error: err?.message || 'Failed to list products' });
+  } catch (err) {
+    res.status(500).json({ success: false, error: err ? err.message : 'Failed to list products' });
   }
 });
 
 // POST /api/products/track - Add or reactivate product tracking
-productsRouter.post('/track', async (req: Request, res: Response) => {
+productsRouter.post('/track', async (req, res) => {
   try {
     const { store_product_id } = req.body;
     if (!store_product_id) {
       return res.status(400).json({ success: false, error: 'store_product_id is required' });
     }
 
-    // Look up product metadata from catalogService
     const details = await catalogService.getProductById(store_product_id.toString());
-    const slug = details?.slug || `product-${store_product_id}`;
-    const name = details?.name || `Product #${store_product_id}`;
-    const brand = details?.brand || null;
-    const category = details?.category || null;
-    const sku = details?.sku || null;
+    const slug = details ? details.slug : `product-${store_product_id}`;
+    const name = details ? details.name : `Product #${store_product_id}`;
+    const brand = details ? details.brand : null;
+    const category = details ? details.category : null;
+    const sku = details ? details.sku : null;
 
-    let product: Product;
+    let product;
 
     if (supabase) {
-      // Check if already exists
       const { data: existing } = await supabase
         .from('products')
         .select('*')
@@ -62,7 +59,6 @@ productsRouter.post('/track', async (req: Request, res: Response) => {
         .single();
 
       if (existing) {
-        // Reactivate if inactive
         const { data: updated, error } = await supabase
           .from('products')
           .update({ is_active: true, updated_at: new Date().toISOString() })
@@ -71,9 +67,8 @@ productsRouter.post('/track', async (req: Request, res: Response) => {
           .single();
 
         if (error) throw error;
-        product = updated as Product;
+        product = updated;
       } else {
-        // Insert new product
         const { data: inserted, error } = await supabase
           .from('products')
           .insert({
@@ -89,10 +84,9 @@ productsRouter.post('/track', async (req: Request, res: Response) => {
           .single();
 
         if (error) throw error;
-        product = inserted as Product;
+        product = inserted;
       }
     } else {
-      // In-memory store
       let existing = Array.from(inMemoryDb.products.values()).find(
         (p) => p.store_product_id === store_product_id.toString()
       );
@@ -137,14 +131,14 @@ productsRouter.post('/track', async (req: Request, res: Response) => {
       message: 'Product tracked successfully. Initial scrape initiated.',
       product,
     });
-  } catch (err: any) {
-    res.status(500).json({ success: false, error: err?.message || 'Failed to track product' });
+  } catch (err) {
+    res.status(500).json({ success: false, error: err ? err.message : 'Failed to track product' });
   }
 });
 
 // DELETE /api/products/:id - Soft untrack product (is_active = false)
 // Preserves historical price records and audit logs for analysis
-productsRouter.delete('/:id', async (req: Request, res: Response) => {
+productsRouter.delete('/:id', async (req, res) => {
   try {
     const productId = req.params.id;
 
@@ -165,7 +159,6 @@ productsRouter.delete('/:id', async (req: Request, res: Response) => {
       });
     }
 
-    // In-memory
     const prod = inMemoryDb.products.get(productId);
     if (!prod) return res.status(404).json({ success: false, error: 'Product not found' });
 
@@ -177,13 +170,13 @@ productsRouter.delete('/:id', async (req: Request, res: Response) => {
       message: 'Product untracked successfully (soft untrack). History and logs preserved.',
       product: prod,
     });
-  } catch (err: any) {
-    res.status(500).json({ success: false, error: err?.message || 'Failed to untrack product' });
+  } catch (err) {
+    res.status(500).json({ success: false, error: err ? err.message : 'Failed to untrack product' });
   }
 });
 
 // GET /api/products/:id/history - Price and stock history
-productsRouter.get('/:id/history', async (req: Request, res: Response) => {
+productsRouter.get('/:id/history', async (req, res) => {
   try {
     const productId = req.params.id;
 
@@ -200,13 +193,13 @@ productsRouter.get('/:id/history', async (req: Request, res: Response) => {
 
     const history = inMemoryDb.history.get(productId) || [];
     res.json({ success: true, history });
-  } catch (err: any) {
-    res.status(500).json({ success: false, error: err?.message || 'Failed to fetch history' });
+  } catch (err) {
+    res.status(500).json({ success: false, error: err ? err.message : 'Failed to fetch history' });
   }
 });
 
 // GET /api/products/:id/runs - Scrape runs with honest attempts audit log
-productsRouter.get('/:id/runs', async (req: Request, res: Response) => {
+productsRouter.get('/:id/runs', async (req, res) => {
   try {
     const productId = req.params.id;
 
@@ -220,7 +213,7 @@ productsRouter.get('/:id/runs', async (req: Request, res: Response) => {
       if (runsError) throw runsError;
 
       const runIds = (runs || []).map((r) => r.id);
-      let attempts: any[] = [];
+      let attempts = [];
       if (runIds.length > 0) {
         const { data: attData, error: attError } = await supabase
           .from('scrape_attempts')
@@ -232,8 +225,7 @@ productsRouter.get('/:id/runs', async (req: Request, res: Response) => {
         attempts = attData || [];
       }
 
-      // Group attempts by run_id
-      const attemptsByRun = new Map<string, any[]>();
+      const attemptsByRun = new Map();
       for (const att of attempts) {
         const list = attemptsByRun.get(att.run_id) || [];
         list.push(att);
@@ -248,7 +240,6 @@ productsRouter.get('/:id/runs', async (req: Request, res: Response) => {
       return res.json({ success: true, runs: enrichedRuns });
     }
 
-    // In-memory
     const allRuns = Array.from(inMemoryDb.runs.values())
       .filter((r) => r.product_id === productId)
       .sort((a, b) => new Date(b.started_at).getTime() - new Date(a.started_at).getTime());
@@ -259,7 +250,9 @@ productsRouter.get('/:id/runs', async (req: Request, res: Response) => {
     }));
 
     res.json({ success: true, runs: enrichedRuns });
-  } catch (err: any) {
-    res.status(500).json({ success: false, error: err?.message || 'Failed to fetch runs' });
+  } catch (err) {
+    res.status(500).json({ success: false, error: err ? err.message : 'Failed to fetch runs' });
   }
 });
+
+module.exports = { productsRouter };

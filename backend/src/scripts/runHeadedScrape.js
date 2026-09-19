@@ -1,11 +1,9 @@
-import dotenv from 'dotenv';
-dotenv.config();
-
-import { scrapeProductWithRetries } from '../scrapers/playwrightScraper';
+require('dotenv').config();
+const { scrapeProductWithRetries } = require('../scrapers/playwrightScraper');
 
 async function main() {
   const args = process.argv.slice(2);
-  const storeProductId = args[0] || '886'; // default to product 886 (Helix Turntable Studio)
+  const storeProductId = args[0] || '886';
 
   console.log('================================================================');
   console.log('       INE PRICE TRACKER - OBSERVABLE (HEADED) RUNNER           ');
@@ -21,8 +19,8 @@ async function main() {
 
   const startTime = Date.now();
   const result = await scrapeProductWithRetries(storeProductId, {
-    headless: false, // Visible window for screen recording
-    slowMo: 600,     // Paced so the reviewer can follow every step visually
+    headless: false,
+    slowMo: 600,
     maxAttempts: 3,
   });
   const totalDuration = ((Date.now() - startTime) / 1000).toFixed(2);

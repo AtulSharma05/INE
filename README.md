@@ -1,6 +1,6 @@
 # INE Product Price Tracker (Web Scraping Assignment)
 
-A resilient, production-ready Full-Stack Product Price Tracker application built to monitor product prices and inventory levels from INE's mock storefront (`https://demo.inelabteamdev.com/`). Designed to navigate anti-scraping challenges, synthetic delays, dynamic DOM shifts, and intermittent errors across unattended scheduled runs.
+A resilient, production-ready Full-Stack Product Price Tracker application built in **JavaScript** to monitor product prices and inventory levels from INE's mock storefront (`https://demo.inelabteamdev.com/`). Designed to navigate anti-scraping challenges, synthetic delays, dynamic DOM shifts, and intermittent errors across unattended scheduled runs.
 
 ---
 
@@ -20,8 +20,8 @@ A resilient, production-ready Full-Stack Product Price Tracker application built
 
 | Layer | Technology | Deployment |
 | :--- | :--- | :--- |
-| **Frontend** | React (Vite + TypeScript), Lucide Icons, Custom Design System | **Vercel** |
-| **Backend** | Node.js (Express + TypeScript), Playwright (Chromium), `p-limit` | **Render** |
+| **Frontend** | React (Vite JavaScript + JSX), Lucide Icons, Custom Design System | **Vercel** |
+| **Backend** | Node.js (Express JavaScript), Playwright (Chromium), `p-limit` | **Render** |
 | **Database** | Supabase (PostgreSQL) with UUID keys and check constraints | **Supabase** |
 | **Scheduler** | External Cron Service | **cron-job.org** (Every 2 hours) |
 
@@ -33,24 +33,24 @@ A resilient, production-ready Full-Stack Product Price Tracker application built
 ine/
 ├── backend/
 │   ├── src/
-│   │   ├── config/             # Supabase client configuration
-│   │   ├── routes/             # REST routes: catalog, products, scrape
-│   │   ├── scrapers/           # Playwright scraper & DOM sanitization parser
-│   │   ├── scripts/            # runHeadedScrape.ts (CLI headed runner)
-│   │   ├── services/           # Catalog indexing & scrape orchestration
-│   │   ├── types/              # Shared TypeScript definitions
-│   │   └── server.ts           # Main Express server entrypoint
-│   ├── tests/                  # Jest test suite (parser, invariant, API)
+│   │   ├── config/             # Supabase client configuration (supabase.js)
+│   │   ├── routes/             # REST routes: catalog, products, scrape (.js)
+│   │   ├── scrapers/           # Playwright scraper & DOM sanitization parser (.js)
+│   │   ├── scripts/            # runHeadedScrape.js (CLI headed runner)
+│   │   ├── services/           # Catalog indexing & scrape orchestration (.js)
+│   │   └── server.js           # Main Express server entrypoint
+│   ├── tests/                  # Jest test suite (parser.test.js, api.test.js)
 │   ├── package.json
-│   └── tsconfig.json
+│   └── jest.config.js
 ├── frontend/
 │   ├── src/
-│   │   ├── api/                # API client talking to backend
-│   │   ├── components/         # Search modal, Product cards, History & Audit modal
-│   │   ├── App.tsx             # Main React app container
+│   │   ├── api/                # API client (client.js)
+│   │   ├── components/         # Search modal, Product cards, History & Audit modal (.jsx)
+│   │   ├── App.jsx             # Main React app container
+│   │   ├── main.jsx            # Entry point
 │   │   └── index.css           # Modern, responsive design system
 │   ├── package.json
-│   ├── vite.config.ts
+│   ├── vite.config.js
 │   └── vercel.json
 ├── supabase/
 │   └── schema.sql              # Full PostgreSQL database schema & constraints
@@ -171,7 +171,7 @@ To configure unattended scheduled scraping every 2 hours:
 ### Backend on Render
 1. Connect your GitHub repository to [Render.com](https://render.com/).
 2. Create a new **Web Service** with the `backend` directory as Root Directory.
-3. **Build Command:** `npm install && npm run build && npx playwright install chromium --with-deps`
+3. **Build Command:** `npm install && npx playwright install chromium --with-deps`
 4. **Start Command:** `npm start`
 5. Configure Environment Variables:
    - `NODE_ENV`: `production`
@@ -193,5 +193,5 @@ To configure unattended scheduled scraping every 2 hours:
 
 ## 📄 Documentation Deliverables
 
-- **Design Note:** Detailed write-up on anti-scraping mechanisms, reliability trade-offs, and AI pair-programming reflections in [`docs/DESIGN_NOTE.md`](docs/DESIGN_NOTE.md).
-- **Database Schema:** Full PostgreSQL migration in [`supabase/schema.sql`](supabase/schema.sql).
+- **Design Note:** Detailed write-up on anti-scraping mechanisms, reliability trade-offs, and reflections in [`docs/DESIGN_NOTE.md`](docs/DESIGN_NOTE.md).
+- **Database Schema:** Full PostgreSQL schema in [`supabase/schema.sql`](supabase/schema.sql).

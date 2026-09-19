@@ -1,19 +1,13 @@
 import React, { useState, useEffect } from 'react';
 import { X, TrendingUp, ShieldAlert, ChevronDown, ChevronRight, Loader2, CheckCircle2, AlertCircle } from 'lucide-react';
-import type { Product, PriceHistory, ScrapeRun } from '../types';
 import { api } from '../api/client';
 
-interface ProductDetailModalProps {
-  product: Product | null;
-  onClose: () => void;
-}
-
-export const ProductDetailModal: React.FC<ProductDetailModalProps> = ({ product, onClose }) => {
-  const [activeTab, setActiveTab] = useState<'history' | 'logs'>('history');
-  const [history, setHistory] = useState<PriceHistory[]>([]);
-  const [runs, setRuns] = useState<ScrapeRun[]>([]);
+export function ProductDetailModal({ product, onClose }) {
+  const [activeTab, setActiveTab] = useState('history');
+  const [history, setHistory] = useState([]);
+  const [runs, setRuns] = useState([]);
   const [loading, setLoading] = useState(true);
-  const [expandedRunIds, setExpandedRunIds] = useState<Set<string>>(new Set());
+  const [expandedRunIds, setExpandedRunIds] = useState(new Set());
 
   useEffect(() => {
     if (!product) return;
@@ -46,7 +40,7 @@ export const ProductDetailModal: React.FC<ProductDetailModalProps> = ({ product,
 
   if (!product) return null;
 
-  const toggleExpandRun = (runId: string) => {
+  const toggleExpandRun = (runId) => {
     setExpandedRunIds((prev) => {
       const next = new Set(prev);
       if (next.has(runId)) next.delete(runId);
@@ -55,7 +49,7 @@ export const ProductDetailModal: React.FC<ProductDetailModalProps> = ({ product,
     });
   };
 
-  const formatPrice = (val: number, curr: string) => {
+  const formatPrice = (val, curr) => {
     return new Intl.NumberFormat('en-IN', {
       style: 'currency',
       currency: curr || 'INR',
@@ -63,7 +57,6 @@ export const ProductDetailModal: React.FC<ProductDetailModalProps> = ({ product,
     }).format(val);
   };
 
-  // Render SVG timeseries chart
   const renderHistoryChart = () => {
     if (history.length === 0) {
       return (
@@ -319,7 +312,7 @@ export const ProductDetailModal: React.FC<ProductDetailModalProps> = ({ product,
                                 <td colSpan={7} style={{ padding: '0 14px 14px 14px', background: 'rgba(0,0,0,0.2)' }}>
                                   <div className="attempts-detail-box">
                                     <div style={{ fontWeight: 600, fontSize: '0.82rem', marginBottom: 8, color: 'var(--text-secondary)' }}>
-                                      Attempt Breakdown ({run.attempts?.length || 0} attempts recorded):
+                                      Attempt Breakdown ({run.attempts ? run.attempts.length : 0} attempts recorded):
                                     </div>
 
                                     {!run.attempts || run.attempts.length === 0 ? (
@@ -343,7 +336,7 @@ export const ProductDetailModal: React.FC<ProductDetailModalProps> = ({ product,
                                             >
                                               {att.status.toUpperCase()}
                                             </span>
-                                            <span>HTTP: {att.http_status ?? 'N/A'}</span>
+                                            <span>HTTP: {att.http_status !== null ? att.http_status : 'N/A'}</span>
                                             <span>Latency: {att.response_time_ms}ms</span>
                                             <span style={{ color: 'var(--text-muted)' }}>
                                               {new Date(att.timestamp).toLocaleTimeString()}
@@ -374,4 +367,4 @@ export const ProductDetailModal: React.FC<ProductDetailModalProps> = ({ product,
       </div>
     </div>
   );
-};
+}
