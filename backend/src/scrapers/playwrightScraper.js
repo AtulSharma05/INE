@@ -122,21 +122,33 @@ async function scrapeProductWithRetries(storeProductId, options = {}) {
           const mainEl = priceBlockEl.querySelector('.price-main');
           let rawPriceText = '';
           if (mainEl) {
-            const visibleSpans = Array.from(mainEl.querySelectorAll('span')).filter((span) => {
-              const style = window.getComputedStyle(span);
-              return (
-                style.display !== 'none' &&
-                style.visibility !== 'hidden' &&
-                span.getAttribute('aria-hidden') !== 'true' &&
-                !span.classList.contains('mrp') &&
-                !span.classList.contains('badge') &&
-                !span.textContent.toLowerCase().includes('off') &&
-                !span.textContent.toLowerCase().includes('deal price')
-              );
+            // Find candidate elements representing the real discounted selling price:
+            // 1. Must NOT be honeypots (display: none, visibility: hidden, aria-hidden="true")
+            // 2. Must NOT be the crossed-out original MRP (text-decoration contains "line-through")
+            // 3. Must NOT be discount badge ("% off") or transient status ("Updating...")
+            const candidateElements = Array.from(mainEl.children).filter((el) => {
+              const style = window.getComputedStyle(el);
+              const text = (el.textContent || '').trim();
+              const isLineThrough = style.textDecoration && style.textDecoration.includes('line-through');
+              const isHidden =
+                style.display === 'none' ||
+                style.visibility === 'hidden' ||
+                el.getAttribute('aria-hidden') === 'true';
+              const isBadgeOrStatus =
+                text.includes('%') ||
+                text.toLowerCase().includes('off') ||
+                text.toLowerCase().includes('updating');
+              return !isHidden && !isLineThrough && !isBadgeOrStatus && text.length > 0;
             });
 
-            if (visibleSpans.length > 0) {
-              rawPriceText = visibleSpans[0].textContent || '';
+            if (candidateElements.length > 0) {
+              rawPriceText = candidateElements[0].textContent || '';
+            } else {
+              // Fallback: search within mainEl for large font element
+              const pv = mainEl.querySelector('[class*="pv-"], [style*="2.4rem"]');
+              if (pv) {
+                rawPriceText = pv.textContent || '';
+              }
             }
           }
 
