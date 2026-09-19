@@ -1,4 +1,5 @@
 const { chromium } = require('playwright');
+const { execSync } = require('child_process');
 const { validateScrapedData } = require('./parser');
 
 /**
@@ -19,11 +20,23 @@ async function scrapeProductWithRetries(storeProductId, options = {}) {
   let browser = null;
 
   try {
-    browser = await chromium.launch({
+    const launchArgs = {
       headless,
       slowMo,
       args: ['--no-sandbox', '--disable-setuid-sandbox', '--disable-dev-shm-usage'],
-    });
+    };
+
+    try {
+      browser = await chromium.launch(launchArgs);
+    } catch (launchErr) {
+      if (launchErr && launchErr.message && launchErr.message.includes("Executable doesn't exist")) {
+        console.warn('⚠️ Chromium binary missing at runtime. Executing self-healing installation...');
+        execSync('npx playwright install chromium', { stdio: 'inherit' });
+        browser = await chromium.launch(launchArgs);
+      } else {
+        throw launchErr;
+      }
+    }
 
     for (let attemptNum = 1; attemptNum <= maxAttempts; attemptNum++) {
       const startTime = Date.now();

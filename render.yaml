@@ -3,7 +3,7 @@ services:
     name: ine-price-tracker-backend
     env: node
     plan: free
-    buildCommand: npm install && npx playwright install chromium
+    buildCommand: PLAYWRIGHT_BROWSERS_PATH=0 npm install && PLAYWRIGHT_BROWSERS_PATH=0 npx playwright install chromium
     startCommand: npm start
     rootDir: backend
     envVars:
@@ -11,6 +11,8 @@ services:
         value: production
       - key: PORT
         value: 10000
+      - key: PLAYWRIGHT_BROWSERS_PATH
+        value: "0"
       - key: MOCK_STORE_URL
         value: https://demo.inelabteamdev.com
       - key: SUPABASE_URL

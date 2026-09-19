@@ -8,7 +8,7 @@
     "dev": "nodemon src/server.js",
     "scrape:headed": "node src/scripts/runHeadedScrape.js",
     "test": "jest --runInBand --forceExit",
-    "postinstall": "playwright install chromium"
+    "postinstall": "PLAYWRIGHT_BROWSERS_PATH=0 playwright install chromium"
   },
   "dependencies": {
     "@supabase/supabase-js": "^2.49.1",
