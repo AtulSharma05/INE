@@ -14,6 +14,14 @@ const PORT = process.env.PORT || 5001;
 app.use(cors());
 app.use(express.json());
 
+// Normalize duplicate slashes in incoming request paths (e.g. //api/health -> /api/health)
+app.use((req, res, next) => {
+  if (req.url && req.url.includes('//')) {
+    req.url = req.url.replace(/\/+/g, '/');
+  }
+  next();
+});
+
 // Health check endpoint (for monitoring and Render readiness)
 app.get('/api/health', (req, res) => {
   res.json({

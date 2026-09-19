@@ -1,4 +1,6 @@
-const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:5001';
+const rawBaseUrl = import.meta.env.VITE_API_BASE_URL || 'http://localhost:5001';
+// Strip any trailing slash to prevent double-slash 404 errors (e.g. .com//api)
+const API_BASE_URL = rawBaseUrl.replace(/\/+$/, '');
 
 async function fetchJson(url, options) {
   const res = await fetch(url, {
