@@ -4,12 +4,14 @@ require('dotenv').config();
 let rawUrl = (process.env.SUPABASE_URL || '').trim().replace(/\/+$/, '');
 const supabaseKey = (process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.SUPABASE_ANON_KEY || '').trim();
 
-// Auto-fix: if user accidentally pasted the Supabase Dashboard/Studio URL
-// e.g. https://supabase.com/dashboard/project/xyz
+// Auto-fix 1: if user accidentally pasted the Supabase Dashboard/Studio URL
 const dashboardMatch = rawUrl.match(/dashboard\/project\/([a-zA-Z0-9_-]+)/);
 if (dashboardMatch) {
   rawUrl = `https://${dashboardMatch[1]}.supabase.co`;
 }
+
+// Auto-fix 2: strip /rest/v1 if included (Supabase SDK appends this automatically)
+rawUrl = rawUrl.replace(/\/rest\/v1\/?$/i, '').replace(/\/+$/, '');
 
 let supabase = null;
 
