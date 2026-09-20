@@ -122,32 +122,63 @@ async function scrapeProductWithRetries(storeProductId, options = {}) {
           const mainEl = priceBlockEl.querySelector('.price-main');
           let rawPriceText = '';
           if (mainEl) {
-            // Find candidate elements representing the real discounted selling price:
-            // 1. Must NOT be honeypots (display: none, visibility: hidden, aria-hidden="true")
+            // Find the true hero selling price element:
+            // 1. Must NOT be honeypots (display: none, visibility: hidden, aria-hidden="true", data-price="true")
             // 2. Must NOT be the crossed-out original MRP (text-decoration contains "line-through")
-            // 3. Must NOT be discount badge ("% off") or transient status ("Updating...")
-            const candidateElements = Array.from(mainEl.children).filter((el) => {
+            // 3. Must NOT be intermediate deal price ("Deal price ...")
+            // 4. Must NOT be discount badge ("% off") or transient status ("Updating...")
+
+            // Priority 1: Direct match on the hero price element (rendered with class matching pv-* or style 2.4rem)
+            const heroCandidate = Array.from(
+              mainEl.querySelectorAll('[class*="pv-"], [style*="2.4rem"]')
+            ).find((el) => {
               const style = window.getComputedStyle(el);
-              const text = (el.textContent || '').trim();
-              const isLineThrough = style.textDecoration && style.textDecoration.includes('line-through');
               const isHidden =
                 style.display === 'none' ||
                 style.visibility === 'hidden' ||
-                el.getAttribute('aria-hidden') === 'true';
-              const isBadgeOrStatus =
+                el.getAttribute('aria-hidden') === 'true' ||
+                el.getAttribute('data-price') === 'true';
+              const isLineThrough = style.textDecoration && style.textDecoration.includes('line-through');
+              const text = (el.textContent || '').trim().toLowerCase();
+              const isExcluded =
+                text.includes('deal') ||
+                text.includes('off') ||
                 text.includes('%') ||
-                text.toLowerCase().includes('off') ||
-                text.toLowerCase().includes('updating');
-              return !isHidden && !isLineThrough && !isBadgeOrStatus && text.length > 0;
+                text.includes('updating') ||
+                text.includes('mrp');
+              return !isHidden && !isLineThrough && !isExcluded && text.length > 0;
             });
 
-            if (candidateElements.length > 0) {
-              rawPriceText = candidateElements[0].textContent || '';
+            if (heroCandidate) {
+              rawPriceText = heroCandidate.textContent || '';
             } else {
-              // Fallback: search within mainEl for large font element
-              const pv = mainEl.querySelector('[class*="pv-"], [style*="2.4rem"]');
-              if (pv) {
-                rawPriceText = pv.textContent || '';
+              // Priority 2: Filter all children of price-main and pick the hero element by largest font size (> 20px / 2.4rem)
+              const validCandidates = Array.from(mainEl.children).filter((el) => {
+                const style = window.getComputedStyle(el);
+                const text = (el.textContent || '').trim().toLowerCase();
+                const isHidden =
+                  style.display === 'none' ||
+                  style.visibility === 'hidden' ||
+                  el.getAttribute('aria-hidden') === 'true' ||
+                  el.getAttribute('data-price') === 'true';
+                const isLineThrough = style.textDecoration && style.textDecoration.includes('line-through');
+                const isExcluded =
+                  text.includes('deal') ||
+                  text.includes('off') ||
+                  text.includes('%') ||
+                  text.includes('updating') ||
+                  text.includes('mrp');
+                return !isHidden && !isLineThrough && !isExcluded && text.length > 0;
+              });
+
+              validCandidates.sort((a, b) => {
+                const fontA = parseFloat(window.getComputedStyle(a).fontSize) || 0;
+                const fontB = parseFloat(window.getComputedStyle(b).fontSize) || 0;
+                return fontB - fontA;
+              });
+
+              if (validCandidates.length > 0) {
+                rawPriceText = validCandidates[0].textContent || '';
               }
             }
           }
