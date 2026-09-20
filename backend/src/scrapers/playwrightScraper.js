@@ -65,6 +65,16 @@ async function scrapeProductWithRetries(storeProductId, options = {}) {
           throw new Error(`HTTP Error ${httpStatus} received from storefront`);
         }
 
+        // Dismiss cookie consent overlay if rendered
+        const cookieBtn = page.locator('button[aria-label="Accept cookies"], button:has-text("Accept")');
+        if (await cookieBtn.isVisible({ timeout: 500 }).catch(() => false)) {
+          await cookieBtn.click().catch(() => {});
+        }
+        await page.evaluate(() => {
+          document.querySelector('.cookie-overlay')?.remove();
+          document.body.style.overflow = '';
+        }).catch(() => {});
+
         // 2. Wait for price block
         const priceBlockSelector = '.price-block';
         await page.waitForSelector(priceBlockSelector, { timeout: 10000 });
@@ -102,16 +112,42 @@ async function scrapeProductWithRetries(storeProductId, options = {}) {
         // Click Reveal Price
         await revealBtn.click();
 
+        // Handle storefront synthetic 17.5% dropped-click trap:
+        // If storefront silently dropped the click, button remains enabled in price-idle state
+        for (let retryClick = 0; retryClick < 3; retryClick++) {
+          try {
+            await page.waitForSelector(
+              '.price-block.price-success, .price-block.price-error, .price-block[aria-busy="true"], .price-block .spinner',
+              { timeout: 1500 }
+            );
+            break;
+          } catch {
+            const isStillIdle = await page.$('.price-block.price-idle button:not([disabled])');
+            if (isStillIdle) {
+              await isStillIdle.click().catch(() => {});
+            }
+          }
+        }
+
         // 5. Handle dynamic loading states:
         await page.waitForSelector('.price-block.price-success, .price-block.price-error', {
-          timeout: 15000,
+          timeout: 20000,
         });
 
         const isError = await page.$('.price-block.price-error');
         if (isError) {
-          const errorText = await page.locator('.price-block.price-error .price-substatus').textContent();
-          attemptStatus = 'http_error';
-          throw new Error(`Storefront rejected reveal: ${errorText || 'Internal Store Error'}`);
+          const tryAgainBtn = page.locator('.price-block.price-error button:has-text("Try again")');
+          if (await tryAgainBtn.isVisible({ timeout: 1000 }).catch(() => false)) {
+            await tryAgainBtn.click().catch(() => {});
+            await page.waitForSelector('.price-block.price-success', { timeout: 15000 }).catch(() => {});
+          }
+
+          const stillError = await page.$('.price-block.price-error');
+          if (stillError) {
+            const errorText = await page.locator('.price-block.price-error .price-substatus').textContent();
+            attemptStatus = 'http_error';
+            throw new Error(`Storefront rejected reveal: ${errorText || 'Internal Store Error'}`);
+          }
         }
 
         // 6. Extraction while carefully excluding honeypot elements:

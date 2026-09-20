@@ -62,11 +62,31 @@ class ScrapeService {
     }
 
     // 2. Execute Playwright scraper with retries
-    const result = await scrapeProductWithRetries(product.store_product_id, {
-      headless: executionMode === 'headless',
-      slowMo: executionMode === 'headed' ? 500 : 0,
-      maxAttempts: 3,
-    });
+    let result;
+    try {
+      result = await scrapeProductWithRetries(product.store_product_id, {
+        headless: executionMode === 'headless',
+        slowMo: executionMode === 'headed' ? 500 : 0,
+        maxAttempts: 3,
+      });
+    } catch (err) {
+      result = {
+        success: false,
+        final_status: 'failed',
+        total_attempts: 1,
+        attempts: [
+          {
+            attempt_number: 1,
+            status: 'failed',
+            http_status: null,
+            response_time_ms: Date.now() - new Date(startedAt).getTime(),
+            error_message: err ? err.message || String(err) : 'Fatal execution error',
+            timestamp: new Date().toISOString(),
+          },
+        ],
+        error: err ? err.message : 'Fatal execution error',
+      };
+    }
 
     const finishedAt = new Date().toISOString();
     scrapeRun.finished_at = finishedAt;

@@ -31,25 +31,33 @@ class CatalogService {
       allItems.push(...(firstData.items || []));
       totalPages = firstData.pages || 1;
 
-      const pagePromises = [];
-      for (let p = 2; p <= totalPages; p++) {
-        pagePromises.push(
-          (async (pageNumber) => {
-            try {
-              const res = await fetch(`${this.baseUrl}/api/catalog?page=${pageNumber}&pageSize=${pageSize}`);
-              if (!res.ok) return [];
+      const fetchPageWithRetry = async (pageNumber, maxRetries = 3) => {
+        for (let attempt = 1; attempt <= maxRetries; attempt++) {
+          try {
+            const res = await fetch(`${this.baseUrl}/api/catalog?page=${pageNumber}&pageSize=${pageSize}`);
+            if (res.ok) {
               const data = await res.json();
               return data.items || [];
-            } catch {
-              return [];
             }
-          })(p)
-        );
-      }
+          } catch {
+            // Transient network error, retry
+          }
+          await new Promise((r) => setTimeout(r, attempt * 250));
+        }
+        return [];
+      };
 
-      const remainingPages = await Promise.all(pagePromises);
-      for (const items of remainingPages) {
-        allItems.push(...items);
+      // Fetch remaining pages with controlled batch concurrency (3 at a time) to prevent server throttling
+      const batchSize = 3;
+      for (let p = 2; p <= totalPages; p += batchSize) {
+        const batchPromises = [];
+        for (let i = p; i < Math.min(p + batchSize, totalPages + 1); i++) {
+          batchPromises.push(fetchPageWithRetry(i));
+        }
+        const batchResults = await Promise.all(batchPromises);
+        for (const items of batchResults) {
+          allItems.push(...items);
+        }
       }
 
       if (allItems.length > 0) {
@@ -91,6 +99,9 @@ class CatalogService {
     if (/^\d+$/.test(cleanQuery)) {
       const matchById = catalog.find((item) => item.id.toString() === cleanQuery);
       if (matchById) return [matchById];
+
+      const direct = await this.getProductById(cleanQuery);
+      if (direct) return [direct];
     }
 
     const results = catalog.filter((item) => {
